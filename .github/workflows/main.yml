@@ -3,12 +3,14 @@ name: Build and Publish
 on:
   push:
     branches:
+      - master
       - java8
       - openj9
       - openj9-11
       - adopt11
       - test/alpine/*
     tags:
+      - "[0-9]+.[0-9]+.[0-9]+-master"
       - "[0-9]+.[0-9]+.[0-9]+-java8"
       - "[0-9]+.[0-9]+.[0-9]+-openj9"
       - "[0-9]+.[0-9]+.[0-9]+-openj9-11"
@@ -36,7 +38,7 @@ jobs:
     - name: Prepare
       id: prep
       run: |
-        DOCKER_IMAGE=itzg/minecraft-server
+        DOCKER_IMAGE=markichu/minecraft-server-ssh
         VERSION=edge
         if [[ $GITHUB_REF == refs/tags/* ]]; then
           VERSION=${GITHUB_REF#refs/tags/}
@@ -85,7 +87,7 @@ jobs:
         labels: |
           org.opencontainers.image.documentation=https://github.com/itzg/docker-minecraft-server
           org.opencontainers.image.version=${{ steps.prep.outputs.version }}
-          org.opencontainers.image.source=https://github.com/itzg/docker-minecraft-server
+          org.opencontainers.image.source=https://github.com/Markichu/docker-minecraft-server
           org.opencontainers.image.revision=${{ github.sha }}
 
     - name: Image digest
