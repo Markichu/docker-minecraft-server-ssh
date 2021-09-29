@@ -36,6 +36,10 @@ For example, `SSH_PASS=password`.
 
 For modifying the Docker image in any other way. The upstream repository outlines environment variables to do almost anything you could want to do. Please see [itzg/docker-minecraft-server](https://github.com/itzg/docker-minecraft-server).
 
+## Automatic Merging
+
+This repo is set up be automatically updated whenever [itzg/docker-minecraft-server](https://github.com/itzg/docker-minecraft-server) is updated thank to [wei/pull](https://github.com/wei/pull). In the event that this breaks the functionality feel free to contact me on Discord at the username `Markichu#7108`.
+
 ## Support itzg
 
 The original author and many other brilliant contributors have created a perfect Minecraft Docker image. Please consider [buying them a coffee]( https://www.buymeacoffee.com/itzg) or [donating to them on paypal]( https://paypal.me/itzg).
