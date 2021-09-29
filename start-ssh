@@ -4,7 +4,7 @@
 
 if [[ $SSH ]]; then
   if isTrue "$SSH"; then
-    if [[ $PASS ]] && [[ $USER ]]; then
+    if [[ $SSH_PASS ]] && [[ $SSH_USER ]]; then
 		sudo useradd -p $(openssl passwd -crypt $SSH_PASS) -d "/data" $SSH_USER
 	else
 		sudo useradd -p $(openssl passwd -crypt "pass") -d "/data" "user"
