@@ -16,9 +16,7 @@ services:
       - "mc:/data"
     environment:
       EULA: "TRUE"
-      SSH: "FALSE"
-      SSH_USER: "user"
-      SSH_PASS: "pass"
+      SSH: "TRUE"
     restart: always
 
 volumes:

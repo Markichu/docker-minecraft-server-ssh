@@ -3,14 +3,16 @@
 . ${SCRIPTS:-/}start-utils
 
 if [[ $SSH ]]; then
-  if isTrue "$SSH"; then
-    if [[ $SSH_PASS ]] && [[ $SSH_USER ]]; then
-		sudo useradd -p $(openssl passwd -crypt $SSH_PASS) -d "/data" $SSH_USER
-	else
-		sudo useradd -p $(openssl passwd -crypt "pass") -d "/data" "user"
-	fi
+	if isTrue "$SSH"; then
+		if [[ $SSH_PASS ]] && [[ $SSH_USER ]]; then
+			echo "[SSH] Starting SSH server with custom username and password."
+			sudo useradd -p $(openssl passwd -crypt $SSH_PASS) -d "/data" $SSH_USER
+		else
+			echo "[SSH] Starting SSH server with default username and password, 'user' and 'pass'."
+			sudo useradd -p $(openssl passwd -crypt "pass") -d "/data" "user"
+		fi
 
-	mkdir -p /var/run/sshd
-	/usr/sbin/sshd
-  fi
+		mkdir -p /var/run/sshd
+		/usr/sbin/sshd
+	fi
 fi
