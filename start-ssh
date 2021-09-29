@@ -1,0 +1,16 @@
+#!/bin/bash
+
+. ${SCRIPTS:-/}start-utils
+
+if [[ $SSH ]]; then
+  if isTrue "$SSH"; then
+    if [[ $PASS ]] && [[ $USER ]]; then
+		sudo useradd -p $(openssl passwd -crypt $PASS) -d "/data" $USER
+	else
+		sudo useradd -p $(openssl passwd -crypt "pass") -d "/data" "user"
+	fi
+
+	mkdir -p /var/run/sshd
+	/usr/sbin/sshd
+  fi
+fi

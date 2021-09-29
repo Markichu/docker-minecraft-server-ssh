@@ -1,5 +1,7 @@
 #!/bin/bash
 
+${SCRIPTS:-/}start-ssh
+
 . ${SCRIPTS:-/}start-utils
 
 umask 0002
