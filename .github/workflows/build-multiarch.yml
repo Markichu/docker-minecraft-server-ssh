@@ -23,7 +23,7 @@ on:
 
 jobs:
   docker-buildx:
-    if: github.repository == 'itzg/docker-minecraft-server'
+    if: github.repository == 'Markichu/docker-minecraft-server-ssh'
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout
@@ -34,7 +34,7 @@ jobs:
         uses: docker/metadata-action@v3
         with:
           images: |
-            itzg/minecraft-server
+            markichu/minecraft-server-ssh
           tags: |
             type=ref,event=branch
             type=ref,event=tag
