@@ -17,8 +17,8 @@ services:
     environment:
       EULA: "TRUE"
       SSH: "FALSE"
-      USER: "user"
-      PASS: "pass"
+      SSH_USER: "user"
+      SSH_PASS: "pass"
     restart: always
 
 volumes:
