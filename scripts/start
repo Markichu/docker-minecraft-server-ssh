@@ -6,9 +6,12 @@
 # The Dockerfile ENVs take precedence here, but defaulting for testing consistency
 : "${UID:=1000}"
 : "${GID:=1000}"
+: "${SKIP_CHOWN_DATA:=false}"
 
-umask 0002
-chmod g+w /data
+umask "${UMASK:=0002}"
+
+# Remove from previous run and do this as elevated user since file used to be created before demoting
+rm -f "$HOME/.rcon-cli.env"
 
 if ! isTrue "${SKIP_SUDO:-false}" && [ "$(id -u)" = 0 ]; then
   runAsUser=minecraft
@@ -36,7 +39,7 @@ if ! isTrue "${SKIP_SUDO:-false}" && [ "$(id -u)" = 0 ]; then
     fi
   fi
 
-  if [[ $(stat -c "%u" /data) != "$UID" ]]; then
+  if isTrue "${SKIP_CHOWN_DATA}" || [[ $(stat -c "%u" /data) != "$UID" ]]; then
     log "Changing ownership of /data to $UID ..."
     chown -R ${runAsUser}:${runAsGroup} /data
   fi
@@ -45,12 +48,7 @@ if ! isTrue "${SKIP_SUDO:-false}" && [ "$(id -u)" = 0 ]; then
     echo 'hosts: files dns' > /etc/nsswitch.conf
   fi
 
-  distro=$(getDistro)
-  if [[ $distro == alpine ]]; then
-    exec su-exec ${runAsUser}:${runAsGroup} "${SCRIPTS:-/}start-configuration" "$@"
-  else
-    exec gosu ${runAsUser}:${runAsGroup} "${SCRIPTS:-/}start-configuration" "$@"
-  fi
+  exec $(getSudoFromDistro) ${runAsUser}:${runAsGroup} "${SCRIPTS:-/}start-configuration" "$@"
 else
   exec "${SCRIPTS:-/}start-configuration" "$@"
 fi

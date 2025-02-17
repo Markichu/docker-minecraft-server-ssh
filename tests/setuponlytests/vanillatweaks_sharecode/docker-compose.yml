@@ -1,14 +1,16 @@
-version: "3"
-
 services:
   mc:
     restart: "no"
     image: ${IMAGE_TO_TEST:-itzg/minecraft-server}
     environment:
+      VANILLATWEAKS_SHARECODE: MGr52E,tF1zL2,LnEDwT
       EULA: "TRUE"
       SETUP_ONLY: "TRUE"
-      VERSION: ${MINECRAFT_VERSION:-LATEST}
-      VANILLATWEAKS_SHARECODE: MGr52E,tF1zL2,LnEDwT
-      REMOVE_OLD_VANILLATWEAKS: "FALSE"
+      # the following are only used to speed up test execution
+      TYPE: CUSTOM
+      CUSTOM_SERVER: /servers/fake.jar
+      VERSION: 1.18.1
     volumes:
       - ./data:/data
+      # the following are only used to speed up test execution
+      - ./verify.sh:/servers/fake.jar

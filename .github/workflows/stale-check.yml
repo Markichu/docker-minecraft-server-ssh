@@ -6,13 +6,13 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     permissions:
       issues: write
       pull-requests: write
     steps:
       - name: Process Stale Issues
-        uses: actions/stale@v5
+        uses: actions/stale@v9
         with:
           stale-issue-label: status/stale
           stale-pr-label: status/stale

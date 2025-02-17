@@ -2,6 +2,8 @@
 
 set -e -o pipefail
 
+: "${VANILLATWEAKS_FILE:=}"
+: "${VANILLATWEAKS_SHARECODE:=}"
 : "${REMOVE_OLD_DATAPACKS:=false}"
 : "${DATAPACKS_FILE:=}"
 : "${REMOVE_OLD_DATAPACKS_DEPTH:=1} "
@@ -28,28 +30,33 @@ if [[ "$DATAPACKS" ]]; then
     if isURL "$i"; then
       log "Downloading datapack $i ..."
       if ! get -o "${out_dir}" "$i"; then
-        log "ERROR: failed to download from $i into $out_dir"
+        logError "Failed to download from $i into $out_dir"
         exit 2
       fi
     elif [[ -f "$i" && "$i" =~ .*\.zip ]]; then
       log "Copying datapack located at $i ..."
       out_file=$(basename "$i")
       if ! cp "$i" "${out_dir}/$out_file"; then
-        log "ERROR: failed to copy from $i into $out_dir"
+        logError "Failed to copy from $i into $out_dir"
         exit 2
       fi
     elif [[ -d "$i" ]]; then
-      log "Copying datapacks from $i ..."
-      cp "$i"/*.zip "${out_dir}"
+      if [[ -f "$i/pack.mcmeta" ]]; then
+        log "Copying datapack from $i"
+        cp -r "$i" "${out_dir}"
+      else
+        log "Copying datapacks from $i ..."
+        cp "$i"/*.zip "${out_dir}"
+      fi
     else
-      log "ERROR Invalid URL or path given in DATAPACKS: $i"
+      logError "Invalid URL or path given in DATAPACKS: $i"
       exit 2
     fi
   done
 
 elif [[ "$DATAPACKS_FILE" ]]; then
   if [ ! -f "$DATAPACKS_FILE" ]; then
-    log "ERROR: given DATAPACKS_FILE file does not exist"
+    logError "Given DATAPACKS_FILE file does not exist"
     exit 2
   fi
 
@@ -69,9 +76,17 @@ elif [[ "$DATAPACKS_FILE" ]]; then
   fi
 
   if ! get "${args[@]}" ; then
-    log "ERROR: failed to retrieve one or more datapacks"
+    logError "Failed to retrieve one or more datapacks"
     exit 1
   fi
 fi
 
-exec "${SCRIPTS:-/}start-setupForgeApiMods" "$@"
+if [[ ${VANILLATWEAKS_FILE} || ${VANILLATWEAKS_SHARECODE} ]]; then
+  mc-image-helper vanillatweaks \
+    --output-directory="/data" \
+    --world-subdir="${LEVEL:-world}" \
+    --share-codes="$VANILLATWEAKS_SHARECODE" \
+    --pack-files="$VANILLATWEAKS_FILE"
+fi
+
+exec "${SCRIPTS:-/}start-setupModpack" "$@"

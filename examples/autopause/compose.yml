@@ -1,0 +1,18 @@
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    ports:
+      - "25565:25565"
+    volumes:
+      - "mc:/data"
+    environment:
+      EULA: "TRUE"
+      ENABLE_AUTOPAUSE: "TRUE"
+      MAX_TICK_TIME: "-1"
+      # More aggressive settings for demo purposes
+      AUTOPAUSE_TIMEOUT_INIT: "30"
+      AUTOPAUSE_TIMEOUT_EST: "10"
+    restart: unless-stopped
+
+volumes:
+  mc: {}

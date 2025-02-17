@@ -1,0 +1,11 @@
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "true"
+      TYPE: PAPER
+      VERSION: 1.19.3
+      MODRINTH_PROJECTS: "coreprotect"
+      MODRINTH_ALLOWED_VERSION_TYPE: "release"
+    volumes:
+      - ./data:/data

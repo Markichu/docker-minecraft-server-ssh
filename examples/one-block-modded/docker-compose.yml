@@ -1,0 +1,27 @@
+services:
+  mc:
+    image: itzg/minecraft-server
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "true"
+      MODPACK_PLATFORM: AUTO_CURSEFORGE
+      # Allocate API key from https://console.curseforge.com/
+      # and set in .env file making sure to double up dollar signs, such as
+      # CF_API_KEY=$$2a$$10$$....
+      # Refer to https://docker-minecraft-server.readthedocs.io/en/latest/types-and-platforms/mod-platforms/auto-curseforge/#api-key
+      CF_API_KEY: ${CF_API_KEY}
+      CF_SLUG: one-block-modded
+      # Modpack client zip must be manually downloaded from
+      # https://www.curseforge.com/minecraft/modpacks/one-block-modded
+      # due to authors disallowing project distribution
+      CF_MODPACK_ZIP: /modpacks/Modded+OneBlock.zip
+      CF_SET_LEVEL_FROM: OVERRIDES
+      DEBUG: "false"
+      MEMORY: 4G
+    volumes:
+      - mc-data:/data
+      - ./modpacks:/modpacks:ro
+
+volumes:
+  mc-data: {}

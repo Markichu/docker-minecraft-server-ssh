@@ -8,6 +8,10 @@ handleDebugMode
 
 : "${SPIGET_RESOURCES:=}"
 : "${SPIGET_DOWNLOAD_TOLERANCE:=5}" # in minutes
+: "${REMOVE_OLD_MODS:=false}"
+: "${REMOVE_OLD_MODS_EXCLUDE:=}"
+: "${REMOVE_OLD_MODS_INCLUDE:=*.jar,*-version.json}"
+: "${REMOVE_OLD_MODS_DEPTH:=1} "
 
 acceptArgs=(--accept application/zip --accept application/java-archive --accept application/octet-stream)
 
@@ -53,15 +57,19 @@ getResourceFromSpiget() {
     if [[ -n $(find "$versionfile" -mmin +${SPIGET_DOWNLOAD_TOLERANCE}) ]]; then
       urlVersion="https://api.spiget.org/v2/resources/${resource}/versions/latest"
       if ! get -o "${versionfileNew}" "${urlVersion}"; then
-        log "ERROR failed to download resource version meta data '${resource}' from ${urlVersion}"
+        logError "Failed to download resource version meta data '${resource}' from ${urlVersion}"
         exit 2
       fi
 
-      installedVersion=$(jq -r '.name' $versionfile)
+      if isTrue "${REMOVE_OLD_MODS:-false}"; then
+        installedVersion=0.0.0
+      else
+        installedVersion=$(jq -r '.name' $versionfile)
+      fi
       newVersion=$(jq -r '.name' $versionfileNew)
       
       if [ "$installedVersion" = "$newVersion" ]; then
-        log "resource '${resource}' not downloaded because installed version '${installedVersion}' already up to date ('${newVersion}')"
+        log "Resource '${resource}': installed version '${installedVersion}' already up to date"
         mv "${versionfileNew}" "${versionfile}"
       else
         if downloadResourceFromSpiget "${resource}"; then
@@ -75,7 +83,7 @@ getResourceFromSpiget() {
     if downloadResourceFromSpiget "${resource}"; then
       urlVersion="https://api.spiget.org/v2/resources/${resource}/versions/latest"
       if ! get -o "${versionfileNew}" "${urlVersion}"; then
-        log "ERROR failed to download resource version meta data '${resource}' from ${urlVersion}"
+        logError "Failed to download resource version meta data '${resource}' from ${urlVersion}"
         exit 2
       fi
       mv "${versionfileNew}" "${versionfile}"
@@ -91,33 +99,38 @@ downloadResourceFromSpiget() {
   mkdir -p $tempDir
   resourceUrl="https://api.spiget.org/v2/resources/${resource}"
   if ! outfile=$(get_silent --output-filename -o $tempDir "${acceptArgs[@]}" "${resourceUrl}/download"); then
-    log "ERROR: failed to download resource '${resource}' from ${resourceUrl}/download"
+    logError "Failed to download resource '${resource}' from ${resourceUrl}/download"
     if externalUrl=$(get --json-path '$.file.externalUrl' "${resourceUrl}"); then
-      log "       Visit $externalUrl to pre-download the resource"
-      log "       instead of using SPIGET_RESOURCES"
+      logError "       Visit $externalUrl to pre-download the resource"
+      logError "       instead of using SPIGET_RESOURCES"
     fi
     exit 1
   fi
 
   if ! fileType=$(get --json-path '.file.type' "${resourceUrl}"); then
-    log "ERROR: failed to retrieve file type of resource $resource"
+    logError "Failed to retrieve file type of resource $resource"
     exit 1
   fi
-  if containsPlugin "${outfile}"; then
-    log "Moving resource ${resource} into plugins"
-    mv "$outfile" /data/plugins
-  elif containsJars "${outfile}"; then
-    log "Extracting contents of resource ${resource} into plugins"
-    extract "$outfile" /data/plugins
+  if [[ $fileType = .sk ]]; then
+    mkdir -p /data/plugins/Skript/scripts
+    mv "$outfile" /data/plugins/Skript/scripts
   else
-    log "ERROR: file for resource ${resource} has an unexpected file type: ${fileType}"
-    exit 2
+    if containsPlugin "${outfile}"; then
+      log "Moving resource ${resource} into plugins"
+      mv "$outfile" /data/plugins
+    elif containsJars "${outfile}"; then
+      log "Extracting contents of resource ${resource} into plugins"
+      extract "$outfile" /data/plugins
+    else
+      logError "File for resource ${resource} has an unexpected file type: ${fileType}"
+      exit 2
+    fi
   fi
   rm -rf "$tempDir"
 }
 
 if [[ ${SPIGET_RESOURCES} ]]; then
-  if isTrue "${REMOVE_OLD_MODS:-false}"; then
+  if isTrue "${REMOVE_OLD_MODS}"; then
     removeOldMods /data/plugins
     REMOVE_OLD_MODS=false
   fi

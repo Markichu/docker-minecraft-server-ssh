@@ -1,4 +1,3 @@
-version: '3.8'
 # Forge with Sponge API support. THIS REQUIRES DOWNLOADING SPONGEFORGE.
 # Place the SpongeForge jar file in /data/mods. Other Forge mods go here as well.
 # Place Sponge mods in /data/mods/plugins. Yes, this is a directory inside the Forge mod directory. Do NOT use /data/plugins.
@@ -14,8 +13,8 @@ services:
       EULA: "TRUE"
       #VERSION: "1.12.2" (Ensure this is compatbile with the version of SpongeForge you are using!)
       TYPE: "FORGE"
-      FORGEVERSION: "RECOMMENDED"
-      #FORGEVERSION: "14.23.5.2807"
+      FORGE_VERSION: "RECOMMENDED"
+      #FORGE_VERSION: "14.23.5.2807"
       CONSOLE: "false"
       ENABLE_RCON: "true"
       RCON_PASSWORD: "testing"

@@ -1,0 +1,67 @@
+#!/bin/bash
+set -eu
+
+# shellcheck source=start-utils
+. "${SCRIPTS:-/}start-utils"
+
+: "${CF_PAGE_URL:=}"
+: "${CF_SLUG:=}"
+: "${CF_FILE_ID:=}"
+: "${CF_FILENAME_MATCHER:=}"
+: "${CF_PARALLEL_DOWNLOADS:=4}"
+: "${CF_FORCE_SYNCHRONIZE:=false}"
+: "${CF_FORCE_REINSTALL_MODLOADER:=false}"
+: "${CF_IGNORE_MISSING_FILES:=}"
+: "${CF_EXCLUDE_INCLUDE_FILE=/image/cf-exclude-include.json}"
+: "${CF_EXCLUDE_MODS:=}"
+: "${CF_FORCE_INCLUDE_MODS:=}"
+: "${CF_SET_LEVEL_FROM:=}" # --set-level-from
+: "${CF_OVERRIDES_SKIP_EXISTING:=false}" # --overrides-skip-existing
+: "${CF_OVERRIDES_EXCLUSIONS:=}" # --overrides-exclusions
+: "${CF_DOWNLOADS_REPO=$([ -d /downloads ] && echo '/downloads' || echo '')}"
+: "${CF_MODPACK_MANIFEST:=}"
+: "${CF_API_CACHE_DEFAULT_TTL:=}" # as ISO-8601 duration, such as P2D or PT12H
+
+resultsFile=/data/.install-curseforge.env
+
+isDebugging && set -x
+
+ensureRemoveAllModsOff "MODPACK_PLATFORM=AUTO_CURSEFORGE"
+
+args=(
+  --results-file="$resultsFile"
+  --force-synchronize="$CF_FORCE_SYNCHRONIZE"
+  --force-reinstall-modloader="$CF_FORCE_REINSTALL_MODLOADER"
+  --overrides-skip-existing="$CF_OVERRIDES_SKIP_EXISTING"
+)
+setArg() {
+  arg="${1?}"
+  var="${2?}"
+
+  if [[ ${!var} ]]; then
+      args+=("${arg}=${!var}")
+  fi
+}
+setArg --modpack-page-url CF_PAGE_URL
+setArg --file-id CF_FILE_ID
+setArg --slug CF_SLUG
+setArg --modpack-manifest CF_MODPACK_MANIFEST
+setArg --filename-matcher CF_FILENAME_MATCHER
+setArg --set-level-from CF_SET_LEVEL_FROM
+setArg --overrides-exclusions CF_OVERRIDES_EXCLUSIONS
+setArg --ignore-missing-files CF_IGNORE_MISSING_FILES
+setArg --api-cache-default-ttl CF_API_CACHE_DEFAULT_TTL
+setArg --exclude-mods CF_EXCLUDE_MODS
+setArg --force-include-mods CF_FORCE_INCLUDE_MODS
+setArg --exclude-include-file CF_EXCLUDE_INCLUDE_FILE
+setArg --downloads-repo CF_DOWNLOADS_REPO
+
+if ! mc-image-helper install-curseforge "${args[@]}"; then
+    logError "Failed to auto-install CurseForge modpack"
+    exit 1
+fi
+
+applyResultsFile ${resultsFile}
+resolveFamily
+
+exec "${SCRIPTS:-/}start-setupWorld" "$@"

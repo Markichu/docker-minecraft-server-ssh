@@ -9,19 +9,19 @@ isDebugging && set -x
 : "${CANYON_BUILD:=lastSuccessfulBuild}"
 
 if [ "${VERSION}" != "b1.7.3" ]; then
-  log "ERROR: Canyon server type only supports VERSION=b1.7.3"
+  logError "Canyon server type only supports VERSION=b1.7.3"
   exit 1
 fi
 
-canyonJob="https://ci.velocitypowered.com/job/Canyon"
+canyonJob="https://canyonmodded.p0rtal.gay/job/Canyonmodded"
+githubUrl="https://github.com/KoboDev/SupplyAndDemand/releases/download"
+canyonBuildJSON=$(curl -fsSL "${canyonJob}/${CANYON_BUILD}/api/json")
 
 buildRelPath=$(
-  curl -fsSL "${canyonJob}/${CANYON_BUILD}/api/json" |
-    jq -r '.artifacts[0].relativePath'
-)
+    jq -r '.artifacts[0].relativePath' <<< "$canyonBuildJSON"
+) 
 buildNumber=$(
-  curl -fsSL "${canyonJob}/${CANYON_BUILD}/api/json" |
-    jq -r '.number'
+    jq -r '.number'<<< "$canyonBuildJSON"
 )
 baseName=$(basename "${buildRelPath}")
 
@@ -33,11 +33,24 @@ else
 fi
 
 if [ ! -f "$SERVER" ]; then
-    downloadUrl="${canyonJob}/${CANYON_BUILD}/artifact/${buildRelPath}"
-    log "Downloading Canyon build ${buildNumber} from $downloadUrl ..."
+    # If CANYON_BUILD is old artifact, then download from GitHub
+    if [ "${CANYON_BUILD}" = "final" ]; then
+        downloadUrl="${githubUrl}/finalcanyon/canyon-server.jar"
+        log "Downloading final Canyon build from $downloadUrl ..."
+    elif [ "${CANYON_BUILD}" = "6" ]; then
+        downloadUrl="${githubUrl}/CanyonRelease/Canyon-Build-6.jar"
+        log "Downloading Canyon build 6 from $downloadUrl ..."
+    elif [ "${CANYON_BUILD}" = "26" ]; then
+        downloadUrl="${githubUrl}/CanyonRelease/canyon-build-26.jar"
+        log "Downloading Canyon build 26 from $downloadUrl ..."
+    # Builds greater than 32 are on Jenkins
+    else
+        downloadUrl="${canyonJob}/${CANYON_BUILD}/artifact/${buildRelPath}"
+        log "Downloading Canyon build ${buildNumber} from $downloadUrl ..."
+    fi
     curl -fsSL -o "$SERVER" "$downloadUrl"
     if [ ! -f "$SERVER" ]; then
-      log "ERROR: failed to download from $downloadUrl (status=$?)"
+      logError "Failed to download from $downloadUrl"
       exit 3
     fi
 fi

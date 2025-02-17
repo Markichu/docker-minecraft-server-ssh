@@ -2,6 +2,8 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+: "${IMAGE_TO_TEST:=itzg/minecraft-server}"
+
 # go to script root directory
 cd "$(dirname "$0")" || exit 1
 
@@ -13,6 +15,13 @@ outputContainerLog() {
 $logs
 ::::::::::::::::::::::::::::::::::
 "
+}
+
+delta() {
+  startTime=${1?}
+
+  endTime=$(date +%s)
+  echo "$(( endTime - startTime )) seconds"
 }
 
 # tests that only run the setup files for things like downloads and configuration.
@@ -32,37 +41,41 @@ setupOnlyMinecraftTest(){
     fi
   fi
 
-  if ! logs=$(docker-compose run mc 2>&1); then
+  # false positive since it's used in delta calculations below
+  # shellcheck disable=SC2034
+  start=$(date +%s)
+  status=PASSED
+  verify=
+  if ! logs=$(docker compose run --rm -e SETUP_ONLY=true -e DEBUG="${DEBUG:-false}" mc 2>&1); then
     outputContainerLog "$logs"
     result=1
   elif [ -f verify.sh ]; then
-    if ! docker run --rm --entrypoint bash -v "${PWD}/data":/data -v "${PWD}/verify.sh":/verify "${IMAGE_TO_TEST:-itzg/minecraft-server}" -e /verify; then
-      echo "Verify ${folder} FAILED"
+    verify=" verify"
+    if ! docker run --rm --entrypoint bash -v "${PWD}/data":/data -v "${PWD}/verify.sh":/verify "${IMAGE_TO_TEST}" -e /verify; then
+      status=FAILED
       outputContainerLog "$logs"
       result=1
-    else
-      echo "Verify ${folder} PASS"
     fi
-  else
-    echo "${folder} PASS"
   fi
+  echo "${folder} ${status}${verify} in $(delta start)"
 
-  docker-compose down -v --remove-orphans > /dev/null
+  docker compose down -v --remove-orphans >& /dev/null
   cd ..
 
   return $result
 }
 
-# go through each folder in setuponly and test setups
-if (( $# > 0 )); then
-  for folder in "$@"; do
-    echo "Starting Tests in ${folder}"
-    setupOnlyMinecraftTest "$folder"
-  done
-else
+foldersList=("$@")
+image=""
+
+# Go through each folder in setuponly and test setups
+if (( $# == 0 )); then
   readarray -t folders < <(find . -maxdepth 2 -mindepth 2 -name docker-compose.yml -printf '%h\n')
-  for folder in "${folders[@]}"; do
-    echo "Starting Tests in ${folder}"
-    setupOnlyMinecraftTest "$folder"
-  done
+  foldersList=("${folders[@]}")
+  image=" using $IMAGE_TO_TEST"
 fi
+
+for folder in "${foldersList[@]}"; do
+  echo "Starting Tests in ${folder}${image}"
+  setupOnlyMinecraftTest "$folder"
+done

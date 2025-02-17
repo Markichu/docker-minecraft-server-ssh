@@ -1,51 +1,61 @@
 #!/bin/bash
 
-. ${SCRIPTS:-/}start-utils
+# shellcheck source=start-utils
+. "${SCRIPTS:-/}start-utils"
 isDebugging && set -x
 
-set -e
+set -eo pipefail
+
+spigotBuildLog="/data/spigot_build.log"
+
+function handleFailedSpigotBuild {
+  logError "Failed to build Spigot"
+  cat ${spigotBuildLog}
+  exit 1
+}
+
 
 function buildSpigotFromSource {
+  local tempDir="/data/temp"
+
   if [[ ${TYPE^^} = *BUKKIT ]] && ! versionLessThan "1.14"; then
-    log "ERR craftbukkit build is only supported for versions less than 1.14"
+    logError "Craftbukkit build is only supported for versions less than 1.14"
     exit 1
   fi
 
   log "Building Spigot $VANILLA_VERSION from source, might take a while, get some coffee"
-  rm -rf /data/temp
-  mkdir /data/temp
-  cd /data/temp
+  rm -rf ${tempDir}
+  mkdir ${tempDir}
+  cd ${tempDir}
 
   jvmOpts="-Xms${INIT_MEMORY:-$MEMORY} -Xmx${MAX_MEMORY:-$MEMORY}"
 
   logn ''
-  curl -sSL -o /data/temp/BuildTools.jar https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar && \
-    java $jvmOpts -jar /data/temp/BuildTools.jar --rev $VANILLA_VERSION 2>&1 |tee /data/spigot_build.log| while read l; do echo -n .; done; log "done"
+  curl -sSL -o ${tempDir}/BuildTools.jar https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar && \
+    java $jvmOpts -jar ${tempDir}/BuildTools.jar --rev "$VERSION" 2>&1 |tee ${spigotBuildLog}| while read l; do echo -n .; done; log "done"
 
   case ${TYPE^^} in
     SPIGOT)
-      if ! mv spigot-*.jar /data/${SERVER}; then
-        log "ERR failed to build Spigot"
-        cat /data/spigot_build.log
-        exit 1
+      if ! mv spigot-*.jar "/data/${SERVER}"; then
+        handleFailedSpigotBuild
       fi
       ;;
     *BUKKIT)
-      if ! mv craftbukkit-*.jar /data/${SERVER}; then
-        log "ERR failed to build Spigot"
-        cat /data/spigot_build.log
-        exit 1
+      if ! mv craftbukkit-*.jar "/data/${SERVER}"; then
+        handleFailedSpigotBuild
       fi
       ;;
   esac
 
   log "Cleaning up"
-  rm -rf /data/temp
+  rm -rf ${tempDir}
   cd /data
 }
 
 function downloadSpigot {
   local match
+  local getBukkitBaseUrl="https://getbukkit.org/download/"
+  local getBukkitSpigotUrl="${getBukkitBaseUrl}spigot" 
   case "$TYPE" in
     *BUKKIT|*bukkit)
       match="CraftBukkit"
@@ -60,46 +70,67 @@ function downloadSpigot {
   esac
 
   if [[ ${VERSION^^} = LATEST ]]; then
-    VANILLA_VERSION=$(restify https://getbukkit.org/download/spigot --attribute='property=og:title' | jq -r '.[0] | .attributes | select(.property == "og:title") | .content | split(" ") | .[-1]')
+    if ! VERSION=$(restify ${getBukkitSpigotUrl} --attribute='property=og:title' | jq -r '.[0] | .attributes | select(.property == "og:title") | .content | split(" ") | .[-1]'); then
+      logError "Failed to retrieve latest version from ${getBukkitSpigotUrl} -- site might be down"
+      exit 1
+    fi
   fi
 
   if [[ -z $downloadUrl ]]; then
-    if versionLessThan 1.16.5 || ([[ ${getbukkitFlavor} = "craftbukkit" ]] && [[ ${VANILLA_VERSION} = "1.16.5" ]]); then
-      downloadUrl="https://cdn.getbukkit.org/${getbukkitFlavor}/${getbukkitFlavor}-${VANILLA_VERSION}.jar"
+    downloadBaseUrl="https://"
+    downloadSuffixUrl=".getbukkit.org/${getbukkitFlavor}/${getbukkitFlavor}-${VERSION}.jar"
+    if versionLessThan 1.16.5 || { [[ ${getbukkitFlavor} = "craftbukkit" ]] && [[ ${VERSION} = "1.16.5" ]] ; }; then
+      downloadBaseUrl+="cdn"
     else
-      downloadUrl="https://download.getbukkit.org/${getbukkitFlavor}/${getbukkitFlavor}-${VANILLA_VERSION}.jar"
+      downloadBaseUrl+="download"
     fi
+    downloadUrl="${downloadBaseUrl}${downloadSuffixUrl}"
   fi
 
   setServerVar
-  if [ -f $SERVER ]; then
+  curlArgs=()
+  if [ -f "$SERVER" ] && ! isTrue "$FORCE_REDOWNLOAD"; then
     # tell curl to only download when newer
-    curlArgs="-z $SERVER"
+    curlArgs+=(-z "$SERVER")
   fi
   if isDebugging; then
-    curlArgs="$curlArgs -v"
+    curlArgs+=(-v)
   fi
   log "Downloading $match from $downloadUrl ..."
-  curl -fsSL -o $SERVER $curlArgs "$downloadUrl"
-  if [[ $? != 0 || $(grep -c "DOCTYPE html" $SERVER) != 0 ]]; then
+
+  tempFile="$SERVER.$$"
+
+  # HTTP error or download site responded with an HTML error page
+  if ! curl -fsSL -o "$tempFile" "${curlArgs[@]}" "$downloadUrl" || ( [ -f "$tempFile" ] && grep -iq "doctype html" "$tempFile" ); then
+
     cat <<EOF
 
 ERROR: failed to download from $downloadUrl
-       Visit https://getbukkit.org/download/${getbukkitFlavor} to lookup the
-       exact version, such as 1.4.6-R0.4-SNAPSHOT or 1.8-R0.1-SNAPSHOT-latest.
-       Click into the version entry to find the **exact** version, because something
-       like "1.8" is not sufficient according to their download naming.
+       Visit ${getBukkitBaseUrl}${getbukkitFlavor} to lookup the
+       exact version or see if download site is unavailable.
+       Click into the version entry to find the **exact** version.
 
 EOF
 
-    if isDebugging && [[ $(grep -c "DOCTYPE html" $SERVER) != 0 ]]; then
-      cat $SERVER
+    if isDebugging && grep -iq "doctype html" "$tempFile"; then
+      cat "$tempFile"
     fi
 
-    # remove invalid download
-    rm $SERVER
-    exit 3
+    if [ -f "$SERVER" ]; then
+      log "Continuing with existing $SERVER file"
+    else
+      # remove invalid download
+      rm "$tempFile"
+      exit 3
+    fi
+
+  else
+    if [ -f "$tempFile" ]; then
+      mv "$tempFile" "$SERVER"
+    fi
+
   fi
+
 
   JVM_OPTS="${JVM_OPTS} -DIReallyKnowWhatIAmDoingISwear"
   export JVM_OPTS
@@ -108,17 +139,18 @@ EOF
 function setServerVar {
   case "$TYPE" in
     *BUKKIT|*bukkit)
-      export SERVER=craftbukkit_server-${VANILLA_VERSION}.jar
+      export SERVER=craftbukkit_server-${VERSION}.jar
       ;;
     *)
-      export SERVER=spigot_server-${VANILLA_VERSION}.jar
+      export SERVER=spigot_server-${VERSION}.jar
       ;;
   esac
 }
 
 if isTrue "$BUILD_SPIGOT_FROM_SOURCE" || isTrue "$BUILD_FROM_SOURCE"; then
+  resolveVersion
   setServerVar
-  if [ ! -f $SERVER ] || [ -n "$FORCE_REDOWNLOAD" ]; then
+  if [ ! -f "$SERVER" ] || isTrue "$FORCE_REDOWNLOAD"; then
     buildSpigotFromSource
   fi
 else
@@ -128,4 +160,4 @@ fi
 # Normalize on Spigot for operations below
 export FAMILY=SPIGOT
 
-exec ${SCRIPTS:-/}start-spiget "$@"
+exec "${SCRIPTS:-/}start-spiget" "$@"
